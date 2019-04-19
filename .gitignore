@@ -134,4 +134,9 @@ secret.py
 
 # Data
 datasets/**
-!/**/.gitkeep
+!/**/osmpois-berlin.csv
+
+# Demo notebooks
+notebooks/**
+!notebooks/Demo_01_Basics.ipynb
+!notebooks/secret.py.example
