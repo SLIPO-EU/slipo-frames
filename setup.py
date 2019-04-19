@@ -7,7 +7,7 @@ metadata = {}
 
 # Required modules
 required = [
-    'slipo>=0.1.1',
+    'slipo>=0.1.2',
 ]
 
 # Get working directory
