@@ -5,6 +5,7 @@ This class provides methods for accessing `SLIPO API` functionality
 from Jupyter notebooks
 """
 
+import os
 import math
 import pandas
 
@@ -12,8 +13,12 @@ from typing import Union, Tuple
 from datetime import datetime
 
 from slipo.client import Client
+from slipo.exceptions import SlipoException
 
-InputType = Union[str, Tuple[int, int]]
+from .model import Process, StepFile
+from .utils import timestamp_to_datetime, format_file_size
+
+InputType = Union[str, Tuple[int, int], Tuple[int, int, int], StepFile]
 
 # Default API endpoint
 BASE_URL = 'https://app.dev.slipo.eu/'
@@ -36,22 +41,6 @@ class SlipoContext(Client):
     def __init__(self, api_key: str, base_url: str = None, requires_ssl: bool = True):
         super().__init__(api_key=api_key, base_url=base_url, requires_ssl=requires_ssl)
 
-    def _to_datetime(self, value: str or None) -> datetime or None:
-        if value is None:
-            return None
-        if math.isnan(value):
-            return None
-
-        return datetime.fromtimestamp(value / 1000)
-
-    def _format_file_size(self, num: int, suffix: str = 'B') -> str:
-        for unit in ['', 'k', 'M', 'G', 'T', 'P', 'E']:
-            if abs(num) < 1024.0:
-                return '%3.1f %s%s' % (num, unit, suffix)
-            num /= 1024.0
-
-        return '%.1f%s%s' % (num, 'Z', suffix)
-
     def _flatten_file_system(self, obj: dict, result: list) -> list:
         if not type(obj) is dict:
             return
@@ -60,7 +49,7 @@ class SlipoContext(Client):
             for f in obj['files']:
                 result.append({
                     'name': f['name'],
-                    'modified': self._to_datetime(f['modified']),
+                    'modified': timestamp_to_datetime(f['modified']),
                     'size': f['size'],
                     'path': f['path']
                 })
@@ -106,22 +95,24 @@ class SlipoContext(Client):
 
         # Optionally, format file size
         if format_size == True:
-            df['size'] = df['size'].apply(lambda x: self._format_file_size(x))
+            df['size'] = df['size'].apply(lambda x: format_file_size(x))
 
         return df
 
-    def file_download(self, source: str, target: str) -> None:
+    def file_download(self, source: str, target: str, overwrite: bool = False) -> None:
         """Download a file from the remote file system.
 
         Args:
             source (str): Relative file path on the remote file system.
             target (str): The path where to save the file.
+            overwrite (bool, optional): Set true if the operation should
+                overwrite any existing file.
 
         Raises:
             SlipoException: If a network, server error or I/O error has occurred.
         """
 
-        result = super().file_download(source, target)
+        result = super().file_download(source, target, overwrite=overwrite)
 
         print('File {source} copied to {target} successfully'.format(
             source=source, target=target))
@@ -129,7 +120,10 @@ class SlipoContext(Client):
         return result
 
     def file_upload(self, source: str, target: str, overwrite: bool = False) -> None:
-        """Upload a file to the remote file system.
+        """Upload a file or folder to the remote file system.
+
+        When a folder is being copied, only the files of the folder are copied while
+        any sub-folders are ignored.
 
         Note:
             File size constraints are enforced on the uploaded file. The default
@@ -152,9 +146,42 @@ class SlipoContext(Client):
             SlipoException: If a network, server error or I/O error has occurred.
         """
 
-        super().file_upload(source, target, overwrite=overwrite)
+        if os.path.isfile(source):
+            # Copy a single file
+            super().file_upload(source, target, overwrite=overwrite)
 
-        print('File uploaded successfully')
+            print(
+                'File [{source}] uploaded successfully'
+                .format(source=source)
+            )
+        elif os.path.isdir(source):
+            # Check target path
+            extension = os.path.splitext(target)
+            # The target folder must not have an extension
+            if extension[1]:
+                raise SlipoException(
+                    'Target {target} must be a folder'.format(target=target))
+            else:
+                self._upload_folder(source, target, overwrite)
+        else:
+            raise SlipoException(
+                'Source {source} does not exist'.format(source=source))
+
+    def _upload_folder(self, sourceDir, targetDir, overwrite):
+        # Copy all files from the source directory
+        files = [
+            f for f in os.listdir(sourceDir) if os.path.isfile(os.path.join(sourceDir, f))
+        ]
+        for f in files:
+            sourceFile = os.path.join(sourceDir, f)
+            targetFile = os.path.join(targetDir, f)
+
+            super().file_upload(sourceFile, targetFile, overwrite=overwrite)
+
+            print(
+                'File [{targetFile}] uploaded successfully'
+                .format(targetFile=targetFile)
+            )
 
     def catalog_query(self, term: str = None, pageIndex: int = 0, pageSize: int = 10) -> pandas.DataFrame:
         """Query resource catalog for RDF datasets.
@@ -206,13 +233,13 @@ class SlipoContext(Client):
 
     def _process_to_dict(self, p: dict) -> dict:
         return {
-            'id': p['id'],
-            'version': p['version'],
-            'updatedOn':  self._to_datetime(p['updatedOn']),
-            'executedOn': self._to_datetime(p['executedOn']),
-            'name': p['name'],
-            'description': p['description'],
-            'taskType': p['taskType'],
+            'Id': p['id'],
+            'Version': p['version'],
+            'Updated On':  timestamp_to_datetime(p['updatedOn']),
+            'Executed On': timestamp_to_datetime(p['executedOn']),
+            'Name': p['name'],
+            'Description': p['description'],
+            'Task Type': p['taskType'],
         }
 
     def _flatten_workflows(self, records: list, result: list) -> list:
@@ -252,65 +279,45 @@ class SlipoContext(Client):
 
         data = self._flatten_workflows(result['items'], [])
 
-        return pandas.DataFrame(
-            data=data
-        )
+        df = pandas.DataFrame(data=data)
 
-    def _collect_process_execution_files(self, exec: dict) -> pandas.DataFrame:
-        result = []
+        # Reorder columns
+        df = df[['Id', 'Version', 'Task Type', 'Name',
+                 'Description', 'Updated On', 'Executed On']]
 
-        if not type(exec) is dict or not 'steps' in exec:
-            return result
+        return df
 
-        for s in exec['steps']:
-            if type(s) is dict and 'files' in s:
-                for f in s['files']:
-                    result.append({
-                        'id': f['id'],
-                        'type': f['type'],
-                        'step': s['name'],
-                        'tool': s['tool'],
-                        'name': f['name'],
-                        'size': f['size'],
-                    })
-
-        return result
-
-    def process_status(self, process_id: int, process_version: int, format_size: bool = False) -> pandas.DataFrame:
+    def process_status(self, process_id: Union[int, Process], process_version: int = None, format_size: bool = False) -> Process:
         """Check the status of a workflow execution instance and return all
         execution files.
 
         Args:
-            process_id (int): The process id.
-            process_version (int): The process revision.
+            process_id (Union[int, Process]): The process id or an instance of
+                :py:class:`Process <slipoframes.model.Process>`
+            process_version (int): The process revision. If `process_id` is an
+                instance of :py:class:`Process <slipoframes.model.Process>`, this
+                parameter is ignored.
             format_size (bool, optional): If true, file size is converted to a
                 user friendly string (default `False`).
 
         Returns:
-            A :obj:`pandas.DataFrame` with all execution files
+            A new instance of :py:class:`Process <slipoframes.model.Process>` class.
 
         Raises:
             SlipoException: If a network or server error has occurred.
         """
 
-        result = super().process_status(process_id, process_version)
+        result = None
+        if type(process_id) is Process:
+            result = super().process_status(process_id.id, process_id.version)
+        else:
+            result = super().process_status(process_id, process_version)
 
-        # Extract files from execution
-        data = self._collect_process_execution_files(result)
+        process = Process(result)
 
-        df = pandas.DataFrame(data=data)
+        print(process)
 
-        # Sort by type and name
-        df = df.sort_values(by=['type', 'id'], axis=0)
-
-        # Optionally, format file size
-        if format_size == True:
-            df['size'] = df['size'].apply(lambda x: self._format_file_size(x))
-
-        print('Process {process} status is {status}'.format(
-            process=(process_id, process_version), status=result['status']))
-
-        return df
+        return process
 
     def process_start(self, process_id: int, process_version: int) -> None:
         """Start or resume execution of a workflow instance.
@@ -348,7 +355,7 @@ class SlipoContext(Client):
 
         return result
 
-    def process_file_download(self, process_id: int, process_version: int, file_id: int, target: str) -> None:
+    def process_file_download(self, process_id: Union[int, StepFile], process_version: int = None, file_id: int = None, target: str = None, overwrite: bool = False) -> None:
         """Download an input or output file for a specific workflow execution instance.
 
         During the execution of a workflow the following file types may be created:
@@ -361,89 +368,103 @@ class SlipoContext(Client):
             - ``LOG``: Logs recorded during step execution 
 
         Args:
-            process_id (int): The process id.
-            process_version (int): The process revision.
-            file_id (int): The file id.
+            process_id (Union[int, StepFile]): The process id or an instance of 
+                :py:class:`StepFile <slipoframes.model.StepFile>`. If a file object
+                is specified, `process_version` and `file_id` arguments are ignored.
+            process_version (int, optional): The process revision.
+            file_id (int, optional): The file id.
             target (str): The path where to save the file.
+            overwrite (bool, optional): Set true if the operation should overwrite
+                any existing file.                
 
         Raises:
             SlipoException: If a network, server error or I/O error has occurred.
         """
 
-        result = super().process_file_download(
-            process_id, process_version, file_id, target)
+        result = None
 
-        print('Process file {file} copied to {target} successfully'.format(
-            file=(process_id, process_version, file_id), target=target))
+        if target is None:
+            raise SlipoException('Parameter target is required')
+
+        if os.path.isfile(target) and not overwrite:
+            raise SlipoException(
+                'File {target} already exists'.format(target=target))
+
+        if os.path.isdir(target):
+            raise SlipoException(
+                'Parameter {target} is a directory'.format(target=target))
+
+        if type(process_id) is StepFile:
+            result = super().process_file_download(
+                process_id.process_id, process_id.process_version, process_id.id, target)
+        else:
+            result = super().process_file_download(
+                process_id, process_version, file_id, target)
+
+        if type(process_id) is StepFile:
+            print('Process file {file} copied to {target} successfully'.format(
+                file=(process_id.process_id,  process_id.process_version, process_id.id), target=target))
+        else:
+            print('Process file {file} copied to {target} successfully'.format(
+                file=(process_id, process_version, file_id), target=target))
 
         return result
 
-    def _status_to_dataframe(self, result: dict) -> pandas.DataFrame:
-        status = {
-            'id': result['id'],
-            'process_id': result['processId'],
-            'process_version': result['processVersion'],
-            'status': result['status'],
-            'taskType': result['taskType'],
-            'name': result['name'],
-            'started_on': self._to_datetime(result['startedOn']),
-            'completed_on': self._to_datetime(result['completedOn']),
-        }
+    def _handle_operation_response(self, result: dict) -> Process:
+        process = Process(result)
 
-        return pandas.io.json.json_normalize(
-            status,
-        )[['id', 'process_id', 'process_version', 'status', 'taskType', 'name', 'started_on', 'completed_on']]
+        print(process)
 
-    def _handle_operation_response(self, result: dict) -> pandas.DataFrame:
-        print('New process {process} status is {status}'.format(
-            process=(result['processId'], result['processVersion']), status=result['status']))
-
-        return self._status_to_dataframe(result)
+        return process
 
     def transform_csv(
         self,
         path: str,
-        profile: str,
         **kwargs
-    ) -> pandas.DataFrame:
+    ) -> Process:
         """Transforms a CSV file to a RDF dataset.
 
         Args:
             path (str): The relative path for a file on the remote user file
                 system.
-            profile (str): The name of the profile to use. Profile names can
-                be retrieved using :meth:`profiles` method.
             **kwargs: Keyword arguments to control the transform operation. Options are:
 
-                - **featureSource** (str, optional): Specifies the data source provider of the
-                  input features.
-                - **encoding** (str, optional): The encoding (character set) for strings in the
-                  input data (default: `UTF-8`)
-                - **attrKey** (str, optional): Field name containing unique identifier for each
-                  entity (e.g., each record in the shapefile).
-                - **attrName** (str, optional): Field name containing name literals
-                  (i.e., strings).
                 - **attrCategory** (str, optional): Field name containing literals regarding
                   classification into categories (e.g., type of points, road classes etc.)
                   for each feature.
                 - **attrGeometry** (str, optional): Parameter that specifies the name of the
                   geometry column in the input dataset.
-                - delimiter (str, optional): Specify the character delimiting attribute
-                  values.
-                - **quote** (str, optional): Specify quote character for string values.
+                - **attrKey** (str, optional): Field name containing unique identifier for each
+                  entity (e.g., each record in the shapefile).
+                - **attrName** (str, optional): Field name containing name literals
+                  (i.e., strings).
                 - **attrX** (str, optional): Specify attribute holding X-coordinates of
-                  point locations.
+                  point locations. If inputFormat is not `CSV`, the parameter is ignored.
                 - **attrY** (str, optional): Specify attribute holding Y-coordinates of
-                  point locations.
-                - **sourceCRS** (str, optional): Specify the EPSG numeric code for the
-                  source CRS (default: `EPSG:4326`).
-                - **targetCRS** (str, optional): Specify the EPSG numeric code for the
-                  target CRS (default: `EPSG:4326`).
+                  point locations. If inputFormat is not `CSV`, the parameter is ignored.
+                - **classificationSpec** (str, optional): The relative path to a YML/CSV
+                  file describing a classification scheme.
                 - **defaultLang** (str, optional): Default lang for the labels created
                   in the output RDF (default: `en`).
+                - delimiter (str, optional): Specify the character delimiting attribute
+                  values.
+                - **encoding** (str, optional): The encoding (character set) for strings in the
+                  input data (default: `UTF-8`)
+                - **featureSource** (str, optional): Specifies the data source provider of the
+                  input features.
+                - **mappingSpec** (str, optional): The relative path to a YML file containing
+                  mappings from input schema to RDF according to a custom ontology.
+                - **profile** (str, optional): The name of the profile to use. Profile names can
+                  be retrieved using :meth:`profiles` method. If profile is not set, the
+                  `mappingSpec` parameter must be set.
+                - **quote** (str, optional): Specify quote character for string values.
+                - **sourceCRS** (str, optional): Specify the EPSG code for the
+                  source CRS (default: `EPSG:4326`).
+                - **targetCRS** (str, optional): Specify the EPSG code for the
+                  target CRS (default: `EPSG:4326`).
 
         Returns:
-            A :obj:`pandas.DataFrame` that contains a single row with execution details
+            A new instance of :py:class:`Process <slipoframes.model.Process>` class.
 
         Raises:
             SlipoException: If a network or server error has occurred.
@@ -451,7 +472,6 @@ class SlipoContext(Client):
 
         result = super().transform_csv(
             path,
-            profile,
             **kwargs
         )
 
@@ -460,41 +480,45 @@ class SlipoContext(Client):
     def transform_shapefile(
         self,
         path: str,
-        profile: str,
         **kwargs
-    ) -> pandas.DataFrame:
+    ) -> Process:
         """Transforms a SHAPEFILE file to a RDF dataset.
 
         Args:
             path (str): The relative path for a file on the remote user file
                 system.
-            profile (str): The name of the profile to use. Profile names can
-                be retrieved using :meth:`profiles` method.
             **kwargs: Keyword arguments to control the transform operation. Options
                 are:
 
-                - **featureSource** (str, optional): Specifies the data source provider of the
-                  input features.
-                - **encoding** (str, optional): The encoding (character set) for strings in the
-                  input data (default: `UTF-8`)
-                - **attrKey** (str, optional): Field name containing unique identifier for each
-                  entity (e.g., each record in the shapefile).
-                - **attrName** (str, optional): Field name containing name literals
-                  (i.e., strings).
                 - **attrCategory** (str, optional): Field name containing literals regarding
                   classification into categories (e.g., type of points, road classes etc.)
                   for each feature.
                 - **attrGeometry** (str, optional): Parameter that specifies the name of the
                   geometry column in the input dataset.
-                - **sourceCRS** (str, optional): Specify the EPSG numeric code for the
-                  source CRS (default: `EPSG:4326`).
-                - **targetCRS** (str, optional): Specify the EPSG numeric code for the
-                  target CRS (default: `EPSG:4326`).
+                - **attrKey** (str, optional): Field name containing unique identifier for each
+                  entity (e.g., each record in the shapefile).
+                - **attrName** (str, optional): Field name containing name literals
+                  (i.e., strings).
+                - **classificationSpec** (str, optional): The relative path to a YML/CSV
+                  file describing a classification scheme.
                 - **defaultLang** (str, optional): Default lang for the labels created
-                  in the output RDF (default: `en`)
+                  in the output RDF (default: `en`).
+                - **encoding** (str, optional): The encoding (character set) for strings in the
+                  input data (default: `UTF-8`)
+                - **featureSource** (str, optional): Specifies the data source provider of the
+                  input features.
+                - **mappingSpec** (str, optional): The relative path to a YML file containing
+                  mappings from input schema to RDF according to a custom ontology.
+                - **profile** (str, optional): The name of the profile to use. Profile names can
+                  be retrieved using :meth:`profiles` method. If profile is not set, the
+                  `mappingSpec` parameter must be set.
+                - **sourceCRS** (str, optional): Specify the EPSG code for the
+                  source CRS (default: `EPSG:4326`).
+                - **targetCRS** (str, optional): Specify the EPSG code for the
+                  target CRS (default: `EPSG:4326`).
 
         Returns:
-            A :obj:`pandas.DataFrame` that contains a single row with execution details
+            A new instance of :py:class:`Process <slipoframes.model.Process>` class.
 
         Raises:
             SlipoException: If a network or server error has occurred.
@@ -502,7 +526,6 @@ class SlipoContext(Client):
 
         result = super().transform_shapefile(
             path,
-            profile,
             **kwargs
         )
 
@@ -513,7 +536,7 @@ class SlipoContext(Client):
         profile: str,
         left: InputType,
         right: InputType
-    ) -> pandas.DataFrame:
+    ) -> Process:
         """Generates links for two RDF datasets.
 
         Arguments `left`, `right` and `links` may be either a :obj:`dict` or
@@ -524,15 +547,21 @@ class SlipoContext(Client):
         Args:
             profile (str): The name of the profile to use. Profile names can
                 be retrieved using :meth:`profiles` method.
-            left (Union[str, Tuple[int, int]]): The `left` RDF dataset.
-            right (Union[str, Tuple[int, int]]): The `right` RDF dataset.
+            left (Union[str, Tuple[int, int], Tuple[int, int, int], StepFile]): The `left` RDF dataset.
+            right (Union[str, Tuple[int, int], Tuple[int, int, int], StepFile]): The `right` RDF dataset.
 
         Returns:
-            A :obj:`pandas.DataFrame` that contains a single row with execution details
+            A new instance of :py:class:`Process <slipoframes.model.Process>` class.
 
         Raises:
             SlipoException: If a network or server error has occurred.
         """
+
+        if type(left) is StepFile:
+            left = (left.process_id, left.process_version, left.id)
+
+        if type(right) is StepFile:
+            right = (right.process_id, right.process_version, right.id)
 
         result = self.operation_client.interlink(profile, left, right)
 
@@ -544,22 +573,31 @@ class SlipoContext(Client):
         left: InputType,
         right: InputType,
         links: InputType
-    ) -> pandas.DataFrame:
+    ) -> Process:
         """Fuses two RDF datasets using Linked Data and returns a new RDF dataset.
 
         Args:
             profile (str): The name of the profile to use. Profile names can
                 be retrieved using :meth:`profiles` method.
-            left (Union[str, Tuple[int, int]]): The `left` RDF dataset.
-            right (Union[str, Tuple[int, int]]): The `right` RDF dataset.
-            links (Union[str, Tuple[int, int]]): The links for the `left` and `right` datasets.
+            left (Union[str, Tuple[int, int], Tuple[int, int, int], StepFile]): The `left` RDF dataset.
+            right (Union[str, Tuple[int, int], Tuple[int, int, int], StepFile]): The `right` RDF dataset.
+            links (Union[str, Tuple[int, int], Tuple[int, int, int], StepFile]): The links for the `left` and `right` datasets.
 
         Returns:
-            A :obj:`pandas.DataFrame` that contains a single row with execution details
+            A new instance of :py:class:`Process <slipoframes.model.Process>` class.
 
         Raises:
             SlipoException: If a network or server error has occurred.
         """
+
+        if type(left) is StepFile:
+            left = (left.process_id, left.process_version, left.id)
+
+        if type(right) is StepFile:
+            right = (right.process_id, right.process_version, right.id)
+
+        if type(links) is StepFile:
+            links = (links.process_id, links.process_version, links.id)
 
         result = super().fuse(profile, left, right, links)
 
@@ -569,21 +607,112 @@ class SlipoContext(Client):
         self,
         profile: str,
         source: InputType
-    ) -> pandas.DataFrame:
+    ) -> Process:
         """Enriches a RDF dataset.
 
         Args:
             profile (str): The name of the profile to use. Profile names can
                 be retrieved using :meth:`profiles` method.
-            source (Union[str, Tuple[int, int]]): The RDF dataset to enrich.
+            source (Union[str, Tuple[int, int], Tuple[int, int, int], StepFile]): The RDF dataset to enrich.
 
         Returns:
-            A :obj:`pandas.DataFrame` that contains a single row with execution details
+            A new instance of :py:class:`Process <slipoframes.model.Process>` class.
 
         Raises:
             SlipoException: If a network or server error has occurred.
         """
 
+        if type(source) is StepFile:
+            source = (source.process_id, source.process_version, source.id)
+
         result = super().enrich(profile, source)
+
+        return self._handle_operation_response(result)
+
+    def export_csv(
+        self,
+        profile: str,
+        source: InputType,
+        **kwargs
+    ) -> Process:
+        """Exports a RDF dataset to a CSV file.
+
+        Args:
+            profile (str): The name of the profile to use. Profile names can
+                be retrieved using :meth:`profiles` method.
+            source (Union[str, Tuple[int, int], Tuple[int, int, int]): The RDF dataset
+                to export.
+            **kwargs: Keyword arguments to control the transform operation. Options are:
+
+                - **defaultLang** (str, optional): The default language for labels created
+                  in output RDF. The default is "en".
+                - delimiter (str, optional):A field delimiter for records (default: `;`).
+                - **encoding** (str, optional): The encoding (character set) for strings in the
+                  input data (default: `UTF-8`)
+                - **quote** (str, optional): Specify quote character for string values (default `"`).
+                - **sourceCRS** (str, optional): Specify the EPSG code for the
+                  source CRS (default: `EPSG:4326`).
+                - **sparqlFile** (str, optional): The relative path to a file containing a 
+                  user-specified SELECT query (in SPARQL) that will retrieve results from
+                  the input RDF triples. This query should conform with the underlying ontology
+                  of the input RDF triples.
+                - **targetCRS** (str, optional): Specify the EPSG code for the
+                  target CRS (default: `EPSG:4326`).
+
+        Returns:
+            A new instance of :py:class:`Process <slipoframes.model.Process>` class.
+
+        Raises:
+            SlipoException: If a network or server error has occurred.
+        """
+        if type(source) is StepFile:
+            source = (source.process_id, source.process_version, source.id)
+
+        result = super().export_csv(profile, source, **kwargs)
+
+        return self._handle_operation_response(result)
+
+    def export_shapefile(
+        self,
+        profile: str,
+        source: InputType,
+        **kwargs
+    ) -> Process:
+        """Exports a RDF dataset to a SHAPEFILE file.
+
+        Args:
+            profile (str): The name of the profile to use. Profile names can
+                be retrieved using :meth:`profiles` method.
+            source (Union[str, Tuple[int, int], Tuple[int, int, int], StepFile]): The RDF dataset
+                to export.
+            **kwargs: Keyword arguments to control the transform operation. Options
+                are:
+
+                - **defaultLang** (str, optional): The default language for labels created
+                  in output RDF. The default is "en".
+                - delimiter (str, optional):A field delimiter for records (default: `;`).
+                - **encoding** (str, optional): The encoding (character set) for strings in the
+                  input data (default: `UTF-8`)
+                - **quote** (str, optional): Specify quote character for string values (default `"`).
+                - **sourceCRS** (str, optional): Specify the EPSG code for the
+                  source CRS (default: `EPSG:4326`).
+                - **sparqlFile** (str, optional): The relative path to a file containing a 
+                  user-specified SELECT query (in SPARQL) that will retrieve results from
+                  the input RDF triples. This query should conform with the underlying ontology
+                  of the input RDF triples.
+                - **targetCRS** (str, optional): Specify the EPSG code for the
+                  target CRS (default: `EPSG:4326`).
+
+        Returns:
+            A new instance of :py:class:`Process <slipoframes.model.Process>` class.
+
+        Raises:
+            SlipoException: If a network or server error has occurred.
+        """
+
+        if type(source) is StepFile:
+            source = (source.process_id, source.process_version, source.id)
+
+        result = super().export_shapefile(profile, source, **kwargs)
 
         return self._handle_operation_response(result)
