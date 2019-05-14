@@ -8,7 +8,7 @@ metadata = {}
 # Required modules
 required = [
     'pandas>=0.24.2',
-    'slipo>=0.1.2',
+    'slipo>=0.1.3',
 ]
 
 # Get working directory
