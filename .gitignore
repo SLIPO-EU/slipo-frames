@@ -132,11 +132,30 @@ examples
 # Testing
 secret.py
 
-# Data
-datasets/**
-!/**/osmpois-berlin.csv
-
 # Demo notebooks
-notebooks/**
+notebooks/*
+
 !notebooks/Demo_01_Basics.ipynb
+!notebooks/Demo_02_Workflow.ipynb
+!notebooks/Demo_03_Data_analysis_using_loci.ipynb
+
 !notebooks/secret.py.example
+
+# Demo datasets
+!notebooks/datasets/
+notebooks/datasets/*
+!notebooks/datasets/DKV_Fuel_Berlin.csv
+!notebooks/datasets/OSM_Fuel_Berlin.csv
+
+# Demo configuration files
+!notebooks/config/
+notebooks/config/*
+!notebooks/config/DKV_Fuel_Berlin_slipo_mappings.yml
+!notebooks/config/DKV_POI_sample_classification.csv
+!notebooks/config/OSM_Fuel_Berlin_slipo_mappings.yml
+!notebooks/config/OSM_POI_sample_classification.csv
+
+# Demo output
+!notebooks/output/
+notebooks/output/*
+!notebooks/output/.gitkeep
