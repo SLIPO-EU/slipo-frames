@@ -41,6 +41,10 @@ class SlipoContext(Client):
     def __init__(self, api_key: str, base_url: str = None, requires_ssl: bool = True):
         super().__init__(api_key=api_key, base_url=base_url, requires_ssl=requires_ssl)
 
+        self.validate()
+
+        print('Application key is valid!')
+
     def _flatten_file_system(self, obj: dict, result: list) -> list:
         if not type(obj) is dict:
             return
