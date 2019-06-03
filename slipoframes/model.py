@@ -8,6 +8,7 @@ class StepFile(object):
 
     Args:
         process (dict): Parent process data
+        execution (dict): Process execution instance
         step_file (dict): Step file data
 
     Returns:
@@ -15,8 +16,9 @@ class StepFile(object):
 
     """
 
-    def __init__(self, process: dict, step_file: dict):
+    def __init__(self, process: dict, execution: dict, step_file: dict):
         self.__process = process
+        self.__execution = execution
         self.__file = step_file
 
     @property
@@ -25,11 +27,11 @@ class StepFile(object):
 
     @property
     def process_id(self):
-        return self.__process['processId']
+        return self.__process['id']
 
     @property
     def process_version(self):
-        return self.__process['processVersion']
+        return self.__process['version']
 
     @property
     def name(self):
@@ -58,27 +60,28 @@ class Process(object):
     """A class that wraps the :obj:`dict` with process data returned by the API
 
     Args:
-        process (dict): Process execution data
+        record (dict): Process execution data
 
     Returns:
         A :py:class:`Process <slipoframes.model.Process>` object.
 
     """
 
-    def __init__(self, process: dict):
-        self.__process = process
+    def __init__(self, record: dict):
+        self.__process = record['process']
+        self.__execution = record['execution']
 
     @property
     def id(self):
-        return self.__process['processId']
+        return self.__process['id']
 
     @property
     def version(self):
-        return self.__process['processVersion']
+        return self.__process['version']
 
     @property
     def status(self):
-        return self.__process['status']
+        return self.__execution['status']
 
     @property
     def name(self):
@@ -86,19 +89,19 @@ class Process(object):
 
     @property
     def submitted_on(self):
-        return timestamp_to_datetime(self.__process['submittedOn'])
+        return timestamp_to_datetime(self.__execution['submittedOn'])
 
     @property
     def started_on(self):
-        return timestamp_to_datetime(self.__process['startedOn'])
+        return timestamp_to_datetime(self.__execution['startedOn'])
 
     @property
     def completedOn(self):
-        return self.__process['completedOn']
+        return self.__execution['completedOn']
 
     def steps(self):
         # Extract files from execution
-        data = self._collect_process_execution_steps(self.__process)
+        data = self._collect_process_execution_steps(self.__execution)
 
         df = pandas.DataFrame(data=data)
 
@@ -131,7 +134,7 @@ class Process(object):
 
     def files(self, format_size: bool = False):
         # Extract files from execution
-        data = self._collect_process_execution_files(self.__process)
+        data = self._collect_process_execution_files(self.__execution)
 
         df = pandas.DataFrame(data=data)
 
@@ -184,10 +187,10 @@ class Process(object):
         """
 
         # Steps must exit
-        if self.__process is None or not 'steps' in self.__process:
+        if self.__execution is None or not 'steps' in self.__execution:
             return None
 
-        steps = self.__process['steps']
+        steps = self.__execution['steps']
 
         # Only operations with a single step are supported
         if not type(steps) is list or len(steps) != 1:
@@ -221,7 +224,7 @@ class Process(object):
 
         matches = [f for f in files if f['outputPartKey'] == output_part_key]
 
-        return StepFile(self.__process, matches[0]) if len(matches) == 1 else None
+        return StepFile(self.__process, self.__execution, matches[0]) if len(matches) == 1 else None
 
     def __str__(self):
         return 'Process ({id}, {version}) status is {status}'.format(id=self.id, version=self.version, status=self.status)
