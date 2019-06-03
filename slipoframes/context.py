@@ -543,10 +543,16 @@ class SlipoContext(Client):
     ) -> Process:
         """Generates links for two RDF datasets.
 
-        Arguments `left`, `right` and `links` may be either a :obj:`dict` or
-        a :obj:`tuple` of two integer values. The former represents a relative
-        path to the remote user file system, while the latter the id and revision
-        of a catalog resource.
+        Arguments `left`, `right` and `links` may be either:
+
+          - A :obj:`str` that represents a relative path to the remote user file system
+          - A :obj:`tuple` of two integer values that represents the id and revision
+            of a catalog resource.
+          - A :obj:`tuple` of three integer values that represents the process id,
+            process revision and output file id for a specific workflow or SLIPO API
+            operation execution.
+          - A :py:class:`StepFile <slipoframes.model.StepFile>` that represents the
+            output of an operation.
 
         Args:
             profile (str): The name of the profile to use. Profile names can

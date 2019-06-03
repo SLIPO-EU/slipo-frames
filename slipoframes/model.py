@@ -23,6 +23,8 @@ class StepFile(object):
 
     @property
     def id(self):
+        """Get step file unique id"""
+
         return self.__file['id']
 
     @property
@@ -43,6 +45,8 @@ class StepFile(object):
 
     @property
     def output_part_key(self):
+        """Get step file output part key"""
+
         return self.__file['outputPartKey']
 
     @property
@@ -73,14 +77,20 @@ class Process(object):
 
     @property
     def id(self):
+        """Get process unique id"""
+
         return self.__process['id']
 
     @property
     def version(self):
+        """Get process version"""
+
         return self.__process['version']
 
     @property
     def status(self):
+        """Get process status"""
+
         return self.__execution['status']
 
     @property
@@ -133,6 +143,16 @@ class Process(object):
         return result
 
     def files(self, format_size: bool = False):
+        """Get all operation files
+
+        Args:
+            format_size (bool, optional): If `True`, the file size is converted
+                to a user friendly string (default `False`).
+
+        Returns:
+            A :obj:`pandas.DataFrame` with all files 
+        """
+
         # Extract files from execution
         data = self._collect_process_execution_files(self.__execution)
 
