@@ -89,6 +89,11 @@ class SlipoContext(Client):
         # Create data frame
         df = pandas.DataFrame(data=data)
 
+        # Check for empty frame
+        if df.empty:
+            print('No data found')
+            return None
+
         # Check if sort column exists
         if not sort_col in df:
             print('Column {sort_col} was not found.'
@@ -284,6 +289,11 @@ class SlipoContext(Client):
         data = self._flatten_workflows(result['items'], [])
 
         df = pandas.DataFrame(data=data)
+
+        # Check for empty frame
+        if df.empty:
+            print('No data found')
+            return None
 
         # Reorder columns
         df = df[['Id', 'Version', 'Task Type', 'Name',
