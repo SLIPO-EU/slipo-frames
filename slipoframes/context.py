@@ -431,6 +431,31 @@ class SlipoContext(Client):
 
         return process
 
+    def profiles(self) -> pandas.DataFrame:
+        """Get the profiles of all SLIPO Toolkit components.
+
+        Returns:
+            A :obj:`pandas.DataFrame` with the profiles of all SLIPO Toolkit components. 
+
+        Raises:
+            SlipoException: If a network or server error has occurred.
+        """
+
+        result = super().profiles()
+
+        data = []
+
+        for tool in result.keys():
+            for profile in result[tool]:
+                data.append([tool, profile])
+
+        df = pandas.DataFrame(data=data, columns=['Tool', 'Profile'])
+
+        if not df.empty:
+            df = df.sort_values(by=['Tool', 'Profile'], axis=0)
+
+        return df
+
     def transform_csv(
         self,
         path: str,
