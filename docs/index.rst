@@ -10,6 +10,7 @@
 
     Overview <slipoframes>
     Context <context>
+    Model <model>
 
 ******************
 Indices and tables

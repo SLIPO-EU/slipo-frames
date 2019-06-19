@@ -89,6 +89,11 @@ class SlipoContext(Client):
         # Create data frame
         df = pandas.DataFrame(data=data)
 
+        # Check for empty frame
+        if df.empty:
+            print('No data found')
+            return None
+
         # Check if sort column exists
         if not sort_col in df:
             print('Column {sort_col} was not found.'
@@ -285,6 +290,11 @@ class SlipoContext(Client):
 
         df = pandas.DataFrame(data=data)
 
+        # Check for empty frame
+        if df.empty:
+            print('No data found')
+            return None
+
         # Reorder columns
         df = df[['Id', 'Version', 'Task Type', 'Name',
                  'Description', 'Updated On', 'Executed On']]
@@ -421,6 +431,31 @@ class SlipoContext(Client):
 
         return process
 
+    def profiles(self) -> pandas.DataFrame:
+        """Get the profiles of all SLIPO Toolkit components.
+
+        Returns:
+            A :obj:`pandas.DataFrame` with the profiles of all SLIPO Toolkit components. 
+
+        Raises:
+            SlipoException: If a network or server error has occurred.
+        """
+
+        result = super().profiles()
+
+        data = []
+
+        for tool in result.keys():
+            for profile in result[tool]:
+                data.append([tool, profile])
+
+        df = pandas.DataFrame(data=data, columns=['Tool', 'Profile'])
+
+        if not df.empty:
+            df = df.sort_values(by=['Tool', 'Profile'], axis=0)
+
+        return df
+
     def transform_csv(
         self,
         path: str,
@@ -543,10 +578,16 @@ class SlipoContext(Client):
     ) -> Process:
         """Generates links for two RDF datasets.
 
-        Arguments `left`, `right` and `links` may be either a :obj:`dict` or
-        a :obj:`tuple` of two integer values. The former represents a relative
-        path to the remote user file system, while the latter the id and revision
-        of a catalog resource.
+        Arguments `left`, `right` and `links` may be either:
+
+          - A :obj:`str` that represents a relative path to the remote user file system
+          - A :obj:`tuple` of two integer values that represents the id and revision
+            of a catalog resource.
+          - A :obj:`tuple` of three integer values that represents the process id,
+            process revision and output file id for a specific workflow or SLIPO API
+            operation execution.
+          - A :py:class:`StepFile <slipoframes.model.StepFile>` that represents the
+            output of an operation.
 
         Args:
             profile (str): The name of the profile to use. Profile names can

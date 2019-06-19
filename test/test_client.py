@@ -18,14 +18,14 @@ class TestContext(unittest.TestCase):
 
         self.assertRaises(SlipoException, create)
 
-    def test_client_requires_ssl_false_warning(self):
+    def test_client_validation_error_exception(self):
         def create(): return SlipoContext(
             api_key=API_KEY,
             base_url='http://127.0.0.1',
             requires_ssl=False,
         )
 
-        self.assertWarns(UserWarning, create)
+        self.assertRaises(SlipoException, create)
 
 
 if __name__ == '__main__':
