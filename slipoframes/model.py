@@ -76,6 +76,18 @@ class Process(object):
         self.__execution = record['execution']
 
     @property
+    def process(self):
+        """Get process dict"""
+
+        return self.__process
+
+    @property
+    def execution(self):
+        """Get execution dict"""
+        
+        return self.__execution
+
+    @property
     def id(self):
         """Get process unique id"""
 

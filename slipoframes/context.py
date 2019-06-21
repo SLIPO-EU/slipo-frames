@@ -18,6 +18,10 @@ from slipo.exceptions import SlipoException
 from .model import Process, StepFile
 from .utils import timestamp_to_datetime, format_file_size
 
+from jinja2 import Environment, FileSystemLoader, Template
+from IPython.display import display, IFrame
+import json
+
 InputType = Union[str, Tuple[int, int], Tuple[int, int, int], StepFile]
 
 # Default API endpoint
@@ -423,6 +427,28 @@ class SlipoContext(Client):
                 file=(process_id, process_version, file_id), target=target))
 
         return result
+
+    def process_render(self, process: Process):
+        """Render the workflow output of a slipo process
+        
+        Args:
+            process (Process)
+
+        """
+
+        data = {"process":process.process, "execution":process.execution }
+
+        env = Environment(
+            loader=FileSystemLoader('templates'),
+            autoescape=True)
+
+        template = env.get_template('basic.html')
+
+        json_data = json.dumps(data, default=str)
+
+        display(IFrame(template.render(data=json_data), width='100%', height=450))
+
+        return 
 
     def _handle_operation_response(self, result: dict) -> Process:
         process = Process(result)

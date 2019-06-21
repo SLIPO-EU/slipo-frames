@@ -9,6 +9,7 @@ metadata = {}
 required = [
     'pandas>=0.24.2',
     'slipo>=0.1.3',
+    'jinja2>=2.10'
 ]
 
 # Get working directory
