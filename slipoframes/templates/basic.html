@@ -1,0 +1,39 @@
+
+
+
+{% extends "iframe.html" %}
+
+{% block srcDoc %}
+  
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+      <title>Workflow Viewer</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta charset="UTF-8">
+      <script src="https://app.dev.slipo.eu/vendor/api/v1/jquery/jquery.min.js"></script>
+      <script src="https://app.dev.slipo.eu/vendor/api/v1/d3/d3.min.js"></script>
+      <script src="https://app.dev.slipo.eu/vendor/api/v1/dagre-d3/dagre-d3.min.js"></script>
+      <link href="https://fonts.googleapis.com/css?family=Roboto&display=swap" rel="stylesheet">
+      <link rel="stylesheet" type="text/css" href="css/main.css">
+  </head>
+  <body>
+    
+      <div class="svg-container">
+          <svg id="workflow" class="svg"></svg>
+          <!-- <div id="info" class="info empty"> Select step ...</div> -->
+          <div class="status-label"></div>
+        </div>
+
+    {# pass dict to js #}
+    <script >
+      var data = {{data|safe}};
+    </script>
+    
+    <script 
+      src="templates/workflow.js">
+    </script>
+   
+  </body>
+</html>
+{% endblock %}

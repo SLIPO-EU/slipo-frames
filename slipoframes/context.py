@@ -18,7 +18,7 @@ from slipo.exceptions import SlipoException
 from .model import Process, StepFile
 from .utils import timestamp_to_datetime, format_file_size
 
-from jinja2 import Environment, FileSystemLoader, Template
+from jinja2 import Environment, PackageLoader, Template
 from IPython.display import display, IFrame
 import json
 
@@ -439,7 +439,7 @@ class SlipoContext(Client):
         data = {"process":process.process, "execution":process.execution }
 
         env = Environment(
-            loader=FileSystemLoader('templates'),
+            loader=PackageLoader('slipoframes', "templates"),
             autoescape=True)
 
         template = env.get_template('basic.html')
