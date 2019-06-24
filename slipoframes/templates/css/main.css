@@ -1,0 +1,102 @@
+  .node rect {
+    fill: none;
+  }
+
+  .edgePath path {
+    stroke: #333;
+    fill: #333;
+    stroke-width: 1.5px;
+  }
+
+  .node text {
+    pointer-events: none;
+  }
+
+  .wrapper {
+    font-family: 'Roboto', sans-serif;
+    margin-left: 10px;
+  }
+
+  .container .wrapper .name {
+    padding: 5px;
+    min-height: 40px;
+    min-width: 120px;
+    background: #E0E0E0;
+    font-size: 1.4rem;
+    border-radius: 5px;
+  }
+
+  .container .wrapper .status {
+    padding: 4px;
+    position: absolute;
+    bottom: 1px;
+    left: 17px;
+    min-width: 100px;
+    border-radius: 5px;
+  }
+
+  .status-label {
+    position: absolute;
+    right: 0px;
+    bottom: 0px;
+    background: #E0E0E0;
+    border-top-left-radius: 5px;
+    padding: 10px;
+    font-family: 'Roboto', sans-serif;
+    font-size: 1rem;
+  }
+
+  .completed {
+    background: #2E7D32;
+    color: #ffffff;
+  }
+
+  .running {
+    background: #1565C0;
+    color: #ffffff;
+  }
+
+  .unknown {
+    background: #424242;
+    color: #ffffff;
+  }
+
+  .failed {
+    background: #c62828;
+    color: #ffffff;
+  }
+
+  .stopped {
+    background: #F9A825;
+    color: #ffffff;
+  }
+
+  .svg-container {
+    width: 100%;
+  }
+
+  .svg {
+    width: 100%;
+  }
+
+  .info {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    min-width: 140px;
+    min-height: 100px;
+    border: 1px dashed #424242;
+    border-radius: 5px;
+    font-family: 'Roboto', sans-serif;
+  }
+
+  .info.empty {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 0.8rem;
+  }
+
+  .info.content {
+    font-size: 0.8rem;
+  }
