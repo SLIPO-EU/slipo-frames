@@ -1,6 +1,6 @@
 nose==1.3.7
 pandas==0.24.2
-slipo==0.1.3
+slipo==0.1.4
 sphinx==2.0.1
 sphinx-rtd-theme==0.4.3
 sphinxcontrib-napoleon==0.7

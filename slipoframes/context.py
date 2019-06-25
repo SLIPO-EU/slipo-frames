@@ -45,7 +45,7 @@ class SlipoContext(Client):
     def __init__(self, api_key: str, base_url: str = None, requires_ssl: bool = True):
         super().__init__(api_key=api_key, base_url=base_url, requires_ssl=requires_ssl)
 
-        self.validate()
+        super().validate()
 
         print('Application key is valid!')
 
