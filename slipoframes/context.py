@@ -12,14 +12,20 @@ import pandas
 from typing import Union, Tuple
 from datetime import datetime
 
+try:
+    from urllib.parse import urljoin
+except ImportError:
+    from urlparse import urljoin
+
 from slipo.client import Client
+from slipo.process import API_VERSION, API_STATUS
 from slipo.exceptions import SlipoException
 
 from .model import Process, StepFile
 from .utils import timestamp_to_datetime, format_file_size
 
 from jinja2 import Environment, PackageLoader, Template
-from IPython.display import display, IFrame
+from IPython.display import HTML
 import json
 
 InputType = Union[str, Tuple[int, int], Tuple[int, int, int], StepFile]
@@ -78,7 +84,7 @@ class SlipoContext(Client):
                 to a user friendly string (default `False`).
 
         Returns:
-            A :obj:`pandas.DataFrame` with all files 
+            A :obj:`pandas.DataFrame` with all files
 
         Raises:
             SlipoException: If a network or server error has occurred.
@@ -140,7 +146,7 @@ class SlipoContext(Client):
 
         Note:
             File size constraints are enforced on the uploaded file. The default
-            installation allows files up to 20 Mb. 
+            installation allows files up to 20 Mb.
 
             Moreover, space quotas are applied on the server. The default user
             space is 5GB.
@@ -200,13 +206,13 @@ class SlipoContext(Client):
         """Query resource catalog for RDF datasets.
 
         Args:
-            term (str, optional): A term for filtering resources. If specified, 
+            term (str, optional): A term for filtering resources. If specified,
                 only the resources whose name contains the term are returned.
             pageIndex (str, optional): Page index for data pagination.
             pageSize (str, optional): Page size for data pagination.
 
         Returns:
-            A :obj:`pandas.DataFrame` with the selected resources 
+            A :obj:`pandas.DataFrame` with the selected resources
 
         Raises:
             SlipoException: If a network or server error has occurred.
@@ -272,7 +278,7 @@ class SlipoContext(Client):
         """Query workflow instances.
 
         Args:
-            term (str, optional): A term for filtering workflows. If specified, 
+            term (str, optional): A term for filtering workflows. If specified,
                 only the workflows whose name contains the term are returned.
             pageIndex (str, optional): Page index for data pagination (default `0`).
             pageSize (str, optional): Page size for data pagination (default `10`).
@@ -383,17 +389,17 @@ class SlipoContext(Client):
             - ``SAMPLE``: Sample data collected during step execution
             - ``KPI``: Tool specific or aggregated KPI data
             - ``QA``: Tool specific QA data
-            - ``LOG``: Logs recorded during step execution 
+            - ``LOG``: Logs recorded during step execution
 
         Args:
-            process_id (Union[int, StepFile]): The process id or an instance of 
+            process_id (Union[int, StepFile]): The process id or an instance of
                 :py:class:`StepFile <slipoframes.model.StepFile>`. If a file object
                 is specified, `process_version` and `file_id` arguments are ignored.
             process_version (int, optional): The process revision.
             file_id (int, optional): The file id.
             target (str): The path where to save the file.
             overwrite (bool, optional): Set true if the operation should overwrite
-                any existing file.                
+                any existing file.
 
         Raises:
             SlipoException: If a network, server error or I/O error has occurred.
@@ -429,26 +435,52 @@ class SlipoContext(Client):
         return result
 
     def process_render(self, process: Process):
-        """Render the workflow output of a slipo process
-        
-        Args:
-            process (Process)
+        """Render a process as a directed acyclic graph (DAG)
 
+        Args:
+            process (Process): An existing instance of :py:class:`Process <slipoframes.model.Process>` class.
+
+        Returns:
+            An instance of :py:class:`HTML <IPython.display.HTML>` class.
+
+        Raises:
+            SlipoException: If a network, server error or I/O error has occurred.
         """
 
-        data = {"process":process.process, "execution":process.execution }
+        # Declare filter for escaping quotes
+        def quote_filter(markup):
+            text = markup.unescape()
 
+            return text.replace('"', '&quot;')
+
+        # Create and configure the environment
         env = Environment(
-            loader=PackageLoader('slipoframes', "templates"),
+            loader=PackageLoader('slipoframes', 'templates'),
             autoescape=True)
 
-        template = env.get_template('basic.html')
+        env.filters['quote'] = quote_filter
 
-        json_data = json.dumps(data, default=str)
+        # Prepare data
+        data = {
+            'process': process.process,
+            'execution': process.execution
+        }
 
-        display(IFrame(template.render(data=json_data), width='100%', height=450))
+        template = env.get_template('workflow.html.j2')
 
-        return 
+        endpoint = API_STATUS.format(
+            api_version=API_VERSION,
+            id=process.id,
+            version=process.version,
+        )
+        url = urljoin(self.base_url, endpoint)
+
+        # Render template
+        return HTML(template.render(
+            api_key=self.api_key,
+            data=data,
+            url=url,
+        ))
 
     def _handle_operation_response(self, result: dict) -> Process:
         process = Process(result)
