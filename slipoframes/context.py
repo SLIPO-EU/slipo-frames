@@ -434,14 +434,14 @@ class SlipoContext(Client):
 
         return result
 
-    def process_render(self, process: Process):
+    def process_render(self, process: Process) -> HTML:
         """Render a process as a directed acyclic graph (DAG)
 
         Args:
             process (Process): An existing instance of :py:class:`Process <slipoframes.model.Process>` class.
 
         Returns:
-            An instance of :py:class:`HTML <IPython.display.HTML>` class.
+            An instance of `HTML` class.
 
         Raises:
             SlipoException: If a network, server error or I/O error has occurred.
