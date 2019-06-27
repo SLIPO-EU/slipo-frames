@@ -23,6 +23,14 @@ with io.open(os.path.join(cur_dir, 'README.md'), mode='r', encoding='utf-8') as 
 with io.open(os.path.join(cur_dir, 'slipoframes', '__version__.py'), mode='r', encoding='utf-8') as f:
     exec(f.read(), metadata)
 
+PACKAGE_DATA = {
+    'slipoframes': [
+        'templates/*',
+        'templates/css/*',
+        'templates/js/*',
+    ],
+}
+
 setup(
     name='slipoframes',
     version=metadata['__version__'],
@@ -45,4 +53,5 @@ setup(
     keywords='poi linked-data point-of-interest data-integration jupyter-notebook',
     test_suite='nose.collector',
     tests_require=['nose'],
+    package_data=PACKAGE_DATA,
 )
