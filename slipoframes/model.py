@@ -84,7 +84,7 @@ class Process(object):
     @property
     def execution(self):
         """Get execution dict"""
-        
+
         return self.__execution
 
     @property
@@ -215,23 +215,19 @@ class Process(object):
 
         Returns:
             A :py:class:`StepFile <slipoframes.model.StepFile>`. If the process has
-            multiple steps or the output part key does not exist, `None` is returned.
+            multiple output steps or the output part key does not exist, `None` is
+            returned.
         """
 
         # Steps must exit
         if self.__execution is None or not 'steps' in self.__execution:
             return None
 
-        steps = self.__execution['steps']
-
-        # Only operations with a single step are supported
-        if not type(steps) is list or len(steps) != 1:
-            return None
-
-        step = steps[0]
+        # Get output step execution
+        step = self.__get_output_step_execution()
 
         # Check files
-        if not 'files' in step:
+        if step is None or not 'files' in step:
             return None
 
         # Resolve output key
@@ -263,3 +259,34 @@ class Process(object):
 
     def __repr__(self):
         return 'Process ({id}, {version})'.format(id=self.id, version=self.version)
+
+    def __get_output_step_execution(self):
+        d = self.__process
+        e = self.__execution
+
+        inputs = set(
+            [item for step in d['steps']
+                for item in step['inputKeys'] if not item is None]
+        )
+
+        output = set(
+            [step['outputKey']
+                for step in d['steps'] if step['operation'] != 'REGISTER']
+        )
+
+        result = list(output - inputs)
+
+        # Only executions with a single output step are supported
+        if len(result) != 1:
+            return None
+
+        steps = [
+            step for step in d['steps'] if step['outputKey'] == result[0]
+        ]
+
+        # Check number of steps since set operations may have removed duplicates.
+        # Export steps have None as output key and more than one export steps may exist.
+        if len(steps) != 1:
+            return None
+
+        return next(iter([step for step in e['steps'] if step['key'] == steps[0]['key']]), None)
