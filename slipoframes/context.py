@@ -477,7 +477,7 @@ class SlipoContext(Client):
 
         # Render template
         return HTML(template.render(
-            api_key=self.api_key,
+            session_token=self.session_token,
             data=data,
             url=url,
         ))

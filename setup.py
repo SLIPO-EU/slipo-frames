@@ -9,7 +9,7 @@ metadata = {}
 install_requires = [
     'jinja2>=2.10',
     'pandas>=0.24.2',
-    'slipo>=0.1.4',
+    'slipo>=0.1.5',
 ]
 
 extras_require = {

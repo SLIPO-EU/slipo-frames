@@ -1,5 +1,5 @@
 // Template parameters
-var apiKey = "{{api_key}}";
+var sessionToken = "{{session_token}}";
 var url = "{{url}}";
 var data = {{data|tojson}};
 
@@ -167,15 +167,15 @@ function setup() {
 $(document).ready(function () {
   setup();
 
-  // Poll server every 5 seconds
-  var timeout = 5000;
+  // Poll server every 10 seconds
+  var timeout = 10000;
   if (data.execution.status === 'RUNNING') {
     var interval = setInterval(function () {
       // Query remote server
       $.ajax({
         dataType: "json",
-        headers: { 'X-API-Key': apiKey },
-        success: function (response) {
+        headers: { 'X-API-Session-Token': sessionToken },
+        success: function(response) {
           data = response.result;
           setup();
 
@@ -183,6 +183,9 @@ $(document).ready(function () {
             clearInterval(interval);
           }
 
+        },
+        error: function(jqXHR, textStatus, errorThrown){
+          // TODO: Display error message
         },
         url: url,
       });
