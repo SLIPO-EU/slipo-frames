@@ -311,6 +311,33 @@ class SlipoContext(Client):
 
         return df
 
+    def process_save(self, process_id: Union[int, Process]) -> Process:
+        """Creates a new version for the specified workflow. The most recent version of
+        the workflow is copied.
+
+        Args:
+            process_id (Union[int, Process]): The process id or an instance of
+                :py:class:`Process <slipoframes.model.Process>`
+
+        Returns:
+            A new instance of :py:class:`Process <slipoframes.model.Process>` class.
+
+        Raises:
+            SlipoException: If a network or server error has occurred.
+        """
+
+        result = None
+        if type(process_id) is Process:
+            result = super().process_save(process_id.id)
+        else:
+            result = super().process_save(process_id)
+
+        process = Process(result)
+
+        print(process)
+
+        return process
+
     def process_status(self, process_id: Union[int, Process], process_version: int = None, format_size: bool = False) -> Process:
         """Check the status of a workflow execution instance and return all
         execution files.
@@ -343,39 +370,62 @@ class SlipoContext(Client):
 
         return process
 
-    def process_start(self, process_id: int, process_version: int) -> None:
+    def process_start(self, process_id: Union[int, Process], process_version: int = None) -> Process:
         """Start or resume execution of a workflow instance.
 
         Args:
-            process_id (int): The process id.
-            process_version (int): The process revision.
+            process_id (Union[int, Process]): The process id or an instance of
+                :py:class:`Process <slipoframes.model.Process>`
+            process_version (int): The process revision. If `process_id` is an
+                instance of :py:class:`Process <slipoframes.model.Process>`, this
+                parameter is ignored.
+
+        Returns:
+            A new instance of :py:class:`Process <slipoframes.model.Process>` class.
 
         Raises:
             SlipoException: If a network or server error has occurred.
         """
 
-        result = super().process_start(process_id, process_version)
 
-        print('Process {process} started successfully'.format(
-            process=(process_id, process_version)))
+        result = None
+        if type(process_id) is Process:
+            result = super().process_start(process_id.id, process_id.version)
+            print('Process {process} started successfully'.format(
+                process=(process_id.id, process_id.version)))
+        else:
+            result = super().process_start(process_id, process_version)
+            print('Process {process} started successfully'.format(
+                process=(process_id, process_version)))
 
-        return result
 
-    def process_stop(self, process_id: int, process_version: int) -> None:
+        process = Process(result)
+
+        return process
+
+    def process_stop(self, process_id: Union[int, Process], process_version: int = None) -> None:
         """Stop a running workflow execution instance.
 
         Args:
-            process_id (int): The process id.
-            process_version (int): The process revision.
+            process_id (Union[int, Process]): The process id or an instance of
+                :py:class:`Process <slipoframes.model.Process>`
+            process_version (int): The process revision. If `process_id` is an
+                instance of :py:class:`Process <slipoframes.model.Process>`, this
+                parameter is ignored.
 
         Raises:
             SlipoException: If a network or server error has occurred.
         """
 
-        result = super().process_stop(process_id, process_version)
-
-        print('Process {process} stopped successfully'.format(
-            process=(process_id, process_version)))
+        result = None
+        if type(process_id) is Process:
+            result = super().process_stop(process_id.id, process_id.version)
+            print('Process {process} stopped successfully'.format(
+                process=(process_id.id, process_id.version)))
+        else:
+            result = super().process_stop(process_id, process_version)
+            print('Process {process} stopped successfully'.format(
+                process=(process_id, process_version)))
 
         return result
 

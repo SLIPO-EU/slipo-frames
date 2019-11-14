@@ -73,7 +73,7 @@ class Process(object):
 
     def __init__(self, record: dict):
         self.__process = record['process']
-        self.__execution = record['execution']
+        self.__execution = record['execution'] or None
 
     @property
     def process(self):
@@ -103,7 +103,7 @@ class Process(object):
     def status(self):
         """Get process status"""
 
-        return self.__execution['status']
+        return 'UNKNOWN' if not self.__execution else self.__execution['status']
 
     @property
     def name(self):
@@ -111,17 +111,20 @@ class Process(object):
 
     @property
     def submitted_on(self):
-        return timestamp_to_datetime(self.__execution['submittedOn'])
+        return None if not self.__execution else timestamp_to_datetime(self.__execution['submittedOn'])
 
     @property
     def started_on(self):
-        return timestamp_to_datetime(self.__execution['startedOn'])
+        return None if not self.__execution else timestamp_to_datetime(self.__execution['startedOn'])
 
     @property
     def completedOn(self):
-        return self.__execution['completedOn']
+        return None if not self.__execution else self.__execution['completedOn']
 
     def steps(self):
+        if self.__execution is None:
+            return None
+
         # Extract files from execution
         data = self._collect_process_execution_steps(self.__execution)
 
@@ -164,6 +167,9 @@ class Process(object):
         Returns:
             A :obj:`pandas.DataFrame` with all files 
         """
+
+        if self.__execution is None:
+            return None
 
         # Extract files from execution
         data = self._collect_process_execution_files(self.__execution)
