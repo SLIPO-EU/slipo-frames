@@ -138,6 +138,7 @@ notebooks/*
 !notebooks/Demo_01_Basics.ipynb
 !notebooks/Demo_02_Workflow.ipynb
 !notebooks/Demo_03_Data_analysis_using_loci.ipynb
+!notebooks/Demo_04_POI_Integration_Workflow_Analytics.ipynb
 
 !notebooks/secret.py.example
 
